@@ -1,0 +1,9 @@
+dist
+build
+main.spec
+.config
+.fund.log
+.idea
+.git
+.DS_Store
+__pacache__
