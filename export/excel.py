@@ -1,5 +1,6 @@
 import os
 import re
+from datetime import datetime
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font
@@ -28,10 +29,12 @@ def _get_index(sheet, headers):
         base = chr(64 + (start // 26)) if start // 26 else ''
         x1 = chr(65 + start % 26)
         x2 = chr(65 + start % 26 + sub_num - 1)
-        title_range = '{}{}1:{}{}1'.format(base, x1, base, x2)
+        title_range = '{}{}{}:{}{}{}'.format(
+            base, x1, len(headers.get('items')) + 1,
+            base, x2, len(headers.get('items')) + 1
+        )
         title = sheet[title_range][0][0].value
         if title == headers.get('title'):
-            # insert data
             return False, start, '{}{}'.format(base, x1)
         if not title:
             headers['range'] = title_range
@@ -41,97 +44,97 @@ def _get_index(sheet, headers):
     return False, -1,
 
 
-def _insert_data(sheet, column, new_column, data):
-    if new_column:
-        row = 3
-        table_date = sheet['A3'].value
-        if not table_date:
-            for i, item in enumerate(data):
-                sheet.cell(row + i, 1, item[0])
-                sheet.cell(row + i, column + 1, item[1])
-                sheet.cell(row + i, column + 1 + 1, item[2])
-            return
-        table_date = table_date.split('-')
-        new_row = 0
-        for index in range(len(data)):
-            data_date = data[index][0].split('-')
-            for t_v, d_v in zip(table_date, data_date):
-                if int(d_v) > int(t_v):
-                    new_row += 1
-                    break
-            else:
-                break
-        if new_row:
-            [sheet.insert_rows(3) for _ in range(new_row)]
-            for i, item in enumerate(data):
-                sheet.cell(3 + i, 1, item[0])
-                sheet.cell(3 + i, column + 1, item[1])
-                sheet.cell(3 + i, column + 1 + 1, item[2])
-        else:
-            data_date = data[0][0].split('-')
-            for index in range(3, 100):
-                table_date = sheet['A{}'.format(index)].value.split('-')
-                if not table_date:
-                    break
-                for t_v, d_v in zip(table_date, data_date):
-                    if int(d_v) < int(t_v):
-                        row += 1
-                        break
-                else:
-                    break
-            for i, item in enumerate(data):
-                sheet.cell(row + i, column + 1, item[1])
-                sheet.cell(row + i, column + 1 + 1, item[2])
+def _insert_data(sheet, headers, column, all_data):
+    header_data, data = all_data
+    row_date = datetime.strptime(data[0][0], '%Y-%m-%d')
+    first_row = sheet['A{}'.format(len(headers.get('items')) + 3)].value
+    base = chr(64 + (column // 26)) if column // 26 else ''
+    x1 = chr(65 + column % 26)
+    x2 = chr(65 + column % 26 + len(headers.get('subs')) - 1)
+    for index, d in enumerate(header_data):
+        column_range = '{}{}{}:{}{}{}'.format(
+            base, x1, index + 1,
+            base, x2, index + 1
+        )
+        sheet.merge_cells(column_range)
+        sheet.cell(index + 1, column + 1, d)
+    if first_row:
+        first_row_date = datetime.strptime(first_row, '%Y-%m-%d')
+        nr = len(headers.get('items')) + 3
+        for index, day in enumerate(range(0, (row_date - first_row_date).days, 7)):
+            new_row_date = datetime.fromtimestamp(
+                first_row_date.timestamp() + 86400 * (day + 7)
+            ).strftime('%Y-%m-%d')
+            sheet.insert_rows(nr)
+            sheet['A{}'.format(nr)] = new_row_date
     else:
-        for i, item in enumerate(reversed(data)):
-            if sheet['A3'].value == item[0]:
-                continue
-            table_date = sheet['A3'].value.split('-')
-            data_date = item[0].split('-')
-            is_new = False
-            for t_v, d_v in zip(table_date, data_date):
-                if int(d_v) > int(t_v):
-                    is_new = True
-                elif int(d_v) == int(t_v):
-                    continue
-                else:
-                    break
-            if is_new:
-                sheet.insert_rows(3)
-                sheet.cell(3, 1, item[0])
-                sheet.cell(3, column + 1, item[1])
-                sheet.cell(3, column + 1 + 1, item[2])
+        for index in range(100):
+            new_row_date = datetime.fromtimestamp(
+                row_date.timestamp() - (86400 * (index * 7))
+            ).strftime('%Y-%m-%d')
+            sheet['A{}'.format(index + len(headers.get('items')) + 3)] = new_row_date
+    for item in reversed(data):
+        for index in range(len(headers.get('items')) + 3, 1000):
+            table_date = sheet['A{}'.format(index)].value
+            try:
+                table_date = datetime.strptime(table_date, '%Y-%m-%d')
+            except Exception as e:
+                print(e)
+            row_date = datetime.strptime(item[0], '%Y-%m-%d')
+            if row_date == table_date:
+                for i, v in enumerate(item[1:]):
+                    try:
+                        sheet.cell(index, column + i + 1, v)
+                    except Exception as e:
+                        print(e)
+                break
 
 
-def make(dtype, headers, data):
+def make(tactics, headers, data):
     file_name = './fond.xlsx'
     if os.path.exists(file_name):
         wb = load_workbook(file_name)
     else:
         wb = Workbook()
     try:
-        sheet = wb.get_sheet_by_name(dtype)
+        sheet = wb.get_sheet_by_name(tactics)
     except KeyError as e:
-        sheet = wb.create_sheet(dtype)
-        _make_headers(sheet, {'title': '名称', 'range': 'A1:A2'})
+        sheet = wb.create_sheet(tactics)
+        for index, item in enumerate(headers.get('items')):
+            cell = sheet.cell(index + 1, 1, item)
+            cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            cell.font = Font(bold=True)
+        cell_range = 'A{}:A{}'.format(len(headers.get('items')) + 1, len(headers.get('items')) + 2)
+        sheet.merge_cells(cell_range)
+        sheet.cell(len(headers.get('items')) + 1, 1, '名称')
     new_column, column, column_range = _get_index(sheet, headers)
-    _insert_data(sheet, column, new_column, data)
+    _insert_data(sheet, headers, column, data)
     wb.save(file_name)
 
 
 if __name__ == '__main__':
-    a = [['2020-11-13', '8.0420', '8.9320'], ['2020-11-06', '7.9150', '8.8050'], ['2020-10-30', '7.7691', '8.6591'], ['2020-10-23', '7.5531', '8.4431']]
-    b = [['2020-11-27', '7.6666', '5.8888'], ['2020-11-20', '3.6666', '5.8888'], ['2020-11-13', '3.6620', '5.3590'], ['2020-11-06', '3.6570', '5.3540'], ['2020-10-30', '3.5060', '5.2030'], ['2020-10-23', '3.4860', '5.1830']]
-    c = [['2020-11-27', '22.6666', '22.8888'], ['2020-11-20', '3.6666', '5.8888'], ['2020-11-13', '3.6620', '5.3590'], ['2020-11-06', '3.6570', '5.3540'],
-         ['2020-10-30', '3.5060', '5.2030'], ['2020-10-23', '3.4860', '5.1830']]
+    a = [[], [['2020-11-20', '9.0420', '8.9320'], ['2020-11-13', '8.0420', '8.9320'], ['2020-11-06', '7.9150', '8.8050'], ['2020-10-30', '7.7691', '8.6591'], ['2020-10-23', '7.5531', '8.4431']]]
+    b = [[], [['2020-12-04', '7.6666', '5.8888'], ['2020-11-27', '7.6666', '5.8888'], ['2020-11-20', '3.6666', '5.8888'], ['2020-11-13', '3.6620', '5.3590'], ['2020-11-06', '3.6570', '5.3540'], ['2020-10-30', '3.5060', '5.2030'], ['2020-10-23', '3.4860', '5.1830']]]
+    c = [[], [['2020-11-20', '22.6666', '22.8888'], ['2020-11-13', '3.6620', '5.3590'], ['2020-11-06', '3.6570', '5.3540'],
+         ['2020-10-30', '3.5060', '5.2030'], ['2020-10-23', '3.4860', '5.1830']]]
+    d = [[], [['2020-11-06', '7.9150', '8.8050'], ['2020-10-30', '7.7691', '8.6591'],
+         ['2020-10-23', '7.5531', '8.4431'], ['2020-10-16', '66.5531', '8.4431'], ['2020-09-25', '66.5531', '8.4431']]]
+    e = [[], [['2020-11-06', '7.9150', '8.8050'], ['2020-10-30', '7.7691', '8.6591'],
+         ['2020-10-23', '7.5531', '8.4431'], ['2020-10-02', '66.5531', '8.4431'], ['2020-09-25', '66.5531', '8.4431']]]
     data = [
         [110011, a],
         [519069, b],
         [519068, c],
         [519099, a],
+        [519078, d],
+        [522099, e],
     ]
+    increase = ['阶段涨幅', '同类平均', '沪深 300', '同类排名']
+    cycle = ['近 1 周', '近 1 月', '近 3 月', '近 6 月', '近 1 年']
+    increase_cycle = ['{}（{}）'.format(i, c) for i in increase for c in cycle]
     for fid, d in data:
         headers = {
+            'items': increase_cycle,
             'title': '易方达（{}）'.format(fid),
             'subs': [
                 {'title': '单位净值'},

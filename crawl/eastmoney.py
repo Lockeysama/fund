@@ -17,7 +17,10 @@ def get_net_worth(fid):
     resp = requests.get(url, headers=headers)
     if resp.status_code == 200:
         print(resp)
-        items = resp.json().get('Data', {}).get('LSJZList')
+        try:
+            items = resp.json().get('Data', {}).get('LSJZList')
+        except Exception as e:
+            return
         result = []
         for item in items:
             y, m, d = [int(i) for i in item.get('FSRQ').split('-')]
@@ -27,6 +30,7 @@ def get_net_worth(fid):
         return result
     else:
         print('failed')
+        return
 
 
 def get_phase_increases(fid):
@@ -45,10 +49,15 @@ def get_phase_increases(fid):
         result = []
         items = doc.xpath('//*/ul')[2:7]
         for item in items:
-             result.append(item.xpath('li/text()')[1:6])
+            r = item.xpath('li/text()')[1:6]
+            rank = '/'.join(r[-2:])
+            r = r[:-2]
+            r.append(rank)
+            result.extend(r)
         return result
     else:
         print('failed')
+        return
 
 
 if __name__ == '__main__':

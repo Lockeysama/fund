@@ -1,3 +1,5 @@
+from datetime import date
+
 import requests
 from lxml import html
 
@@ -13,10 +15,14 @@ def login(user_name, password):
     s.headers = headers
     resp = s.put(url, json={'username': user_name, 'password': password})
     print(resp)
+    if resp.json().get('code') != 0:
+        return
 
     url2 = 'https://www.licai.com/api/v1/auth/login'
-    resp2 = s.post(url)
+    resp2 = s.post(url2)
     print(resp2)
+    if resp2.status_code != 200:
+        return
     return s
 
 
@@ -45,10 +51,13 @@ def get_net_worth(session, fid):
             for item in itmes:
                 values = item.xpath('td/div/span/text()')
                 if len(values) == 5:
-                    result.append(values)
+                    y, m, d = values[0].split('-')
+                    if date(int(y), int(m), int(d)).weekday() == 4:
+                        result.append(values[:4])
         return earnings, sharpe_ratio, result
     else:
         print('failed')
+        return None, None,
 
 
 if __name__ == '__main__':
