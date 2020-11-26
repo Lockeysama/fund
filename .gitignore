@@ -6,4 +6,4 @@ main.spec
 .idea
 .git
 .DS_Store
-__pacache__
+__pycache__
