@@ -3,3 +3,6 @@ build
 main.spec
 .config
 .fund.log
+.idea
+.git
+.DS_Store

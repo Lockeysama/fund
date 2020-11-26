@@ -200,7 +200,7 @@ class Application(tk.Frame):
                 self.log('Sleep(3s)...\n')
                 time.sleep(3)
 
-        username = self.username_val.get()  # '18757878001', '22020319'
+        username = self.username_val.get()
         password = self.password_val.get()
         session = licai.login(username, password)
         if not session:
