@@ -38,7 +38,7 @@ def get_phase_increases(fid):
         'User-Agent': ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) '
                        'AppleWebKit/537.36 (KHTML, like Gecko) '
                        'Chrome/85.0.4183.83 Safari/537.36'),
-        'Referer': 'http://fundf10.eastmoney.com/jdzf_110011.html'
+        'Referer': 'http://fundf10.eastmoney.com/jdzf_{}.html'.format(fid)
     }
     url = ('http://fundf10.eastmoney.com/FundArchivesDatas.aspx?'
            'type=jdzf&code={}&rt=0.6509032210719485').format(fid)
@@ -54,7 +54,16 @@ def get_phase_increases(fid):
             r = r[:-2]
             r.append(rank)
             result.extend(r)
-        return result
+        increase = [result[i] for i in range(0, len(result), 4)]
+        same_avg = [result[i] for i in range(1, len(result), 4)]
+        hs300 = [result[i] for i in range(2, len(result), 4)]
+        rank = [result[i] for i in range(3, len(result), 4)]
+        real = []
+        real.extend(increase)
+        real.extend(same_avg)
+        real.extend(hs300)
+        real.extend(rank)
+        return real
     else:
         print('failed')
         return
@@ -70,7 +79,9 @@ if __name__ == '__main__':
     #     get_net_worth(url)
 
     phase_increases_urls = [
-        'http://fundf10.eastmoney.com/FundArchivesDatas.aspx?type=jdzf&code=110011&rt=0.6509032210719485'
+        '110011',
+        '000875'
     ]
     for url in phase_increases_urls:
-        get_phase_increases(url)
+        print(get_phase_increases(url))
+        print('\n')
